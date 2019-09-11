@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>关键词网络图谱</title>
+    <script src="https://cdn.bootcss.com/echarts/4.2.1-rc1/echarts.min.js"></script>
+    <script src="./2.js"></script>
+</head>
+<style>
+    .main {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+    }
+
+    /* echarts提示框 */
+    .tip-box ul {
+        margin: 3px 0px;
+        list-style: none;
+        padding: 0px;
+    }
+
+    .tip-box ul li {
+        display: flex;
+        margin: 5px 0px;
+        align-items: center;
+    }
+
+    .tip-box ul li i {
+        width: 10px;
+        height: 10px;
+        margin-right: 5px;
+        border-radius: 100%;
+    }
+</style>
+
+<body>
+    <div class="main" id="chartmain"></div>
+    <script type="text/javascript">
+        window.onload = function () {
+            var data = datas.data;
+            data.series = data.nodes;
+            paperAtlas(data, true);
+        }
+        function paperAtlas(data, mark) {
+            var _this = this;
+            var colorArr = ['#FF8828', "#FFF601", '#60C8FF'], itemColor = '', repulsion = 25;
+            if (mark) {//排斥力
+                repulsion = 120;
+            };
+
+            var onfigure = {};
+            if (!mark) {
+                onfigure.fontSize = 10;
+                onfigure.isLabel = false;
+                onfigure.itemGap = 10;
+            } else {
+                onfigure.radius = "50%";
+                onfigure.fontSize = 16;
+                onfigure.isLabel = true;
+                onfigure.itemGap = 20;
+            }
+            // 模拟数据
+
+
+            function random(lower, upper) {
+                return Math.floor(Math.random() * (upper - lower + 1)) + lower;
+            }
+
+            var color = ['#A6C082', '#A9C182', '#ADC383', '#B3C683', '#B9C883', '#C0CB83', '#C4CD84', '#C8CF84', '#CED284', '#CFD284', '#D1D284', '#D4D484', '#DAD684', '#DFD985', '#E1DA84', '#E1DA85', '#E4D884', '#E5D483', '#E4D383', '#E5CF81', '#E5CA7F', '#E6C27E', '#E6BA7B', '#E7B67A', '#E8B279', '#E7AC76', '#E8A675', '#E9A274', '#E99A71', '#EA8F6D', '#EB916F', '#EB8C6D', '#EC846B', '#EC7B68', '#ED7466', '#EE6762', '#EE6160', '#EF585D'];
+
+
+            var seriesArr = [], lineData = [], sourceOrTarget = 'source';
+            var position = [{
+                x: '75%',
+                y: '40%'
+            }, {
+                x: '25%',
+                y: '30%'
+            },
+            {
+                x: '55%',
+                y: '80%'
+            }];
+
+            var heatCoefficient = 0.0004; //圆的大小
+            var lineWidthCoefficient = 0.0005; //线的粗细
+            var positionRange = [20, 80, 20, 80];
+
+            // 每个关键词的热度从大到小排序
+            data.series.forEach(function (item) {
+                item.data.sort(function (a, b) {
+                    return a.heat - b.heat
+                })
+                item.data.forEach(function (ele, i) {
+                    ele.colorIndex = i;
+                })
+            });
+            // 每个关键词的按年份排序排序
+            data.series.forEach(function (item) {
+                item.data.sort(function (a, b) {
+                    return a.year * 1 - b.year * 1
+                })
+            });
+            // 处理内容数据
+            data.series.forEach(function (item, i) {
+                // 坐标在这里计算 position
+                item.position = {
+                    x: random(positionRange[0], positionRange[1]) + "%",
+                    y: random(positionRange[2], positionRange[3]) + "%"
+                };
+                var radiusIn = 0;
+                item.data.forEach(function (ele, n) {
+                    // 圆的大小在这里计算 radius
+                    // console.log(ele);
+
+                    var radiusOut = radiusIn + ele.heat * heatCoefficient;
+                    seriesArr.push({
+                        name: item.name,
+                        type: 'pie',
+                        hoverAnimation: false,
+                        label: {
+                            normal: {
+                                show: false,
+                            }
+                        },
+                        itemStyle: {
+                            // normal: {
+                            //     color: color[ele.colorIndex - 1],
+                            //     opacity: 1,
+                            // }
+                        },
+                        radius: [radiusIn, radiusOut],
+                        center: [item.position.x, item.position.y],
+                        data: [
+                            { value: ele.heat, data: item, name: ele.year, selected: false }
+                        ]
+                    });
+                    radiusIn = radiusOut;
+                });
+            });
+            // 处理连接线的数据
+            data.links.forEach(function (item, i) {
+                var link = [];
+                for (var index = 0; index < data.series.length; index++) {
+                    if (data.series[index].name === item.source.name) {
+                        var mark = data.series[index].position;
+                        delete mark.targetData;
+                        mark.sourceData = { data: item, name: item.source.name, x: mark.x, y: mark.y };
+                        mark.label = {
+                            show: false,
+                        };
+                        mark.emphasis = {
+                            label: {
+                                show: false,
+                                formatter: function (params) {
+                                    return params.data.value
+                                }
+                            }
+                        };
+                        link.push(mark);
+                        break;
+                    };
+                };
+                for (var index = 0; index < data.series.length; index++) {
+                    if (data.series[index].name === item.target.name) {
+                        var mark = data.series[index].position;
+                        delete mark.sourceData;
+                        mark.targetData = { data: item, name: item.target.name, x: mark.x, y: mark.y };
+                        mark.lineStyle = {
+                            width: item.value * lineWidthCoefficient
+                        };
+                        link.push(mark);
+                        break;
+                    };
+                };
+                lineData.push(link);
+            });
+            seriesArr.push({
+                type: 'line',
+                zlevel: 0,
+                z: 0,
+                showAllSymbol: true,//标注所有数据点
+                markLine: {
+                    tooltip: {
+                        position: function (point, params, dom, rect, size) {
+                            var arr = [parseInt(point[0] / size.viewSize[0] * 100), parseInt(point[1] / size.viewSize[1] * 100)];
+                            var sourceArr = [(params.data.sourceData.x.substring(0, params.data.sourceData.x.indexOf('%'))) * 1, (params.data.sourceData.y.substring(0, params.data.sourceData.y.indexOf('%'))) * 1];
+                            var targetArr = [(params.data.targetData.x.substring(0, params.data.targetData.x.indexOf('%'))) * 1, (params.data.targetData.y.substring(0, params.data.targetData.y.indexOf('%'))) * 1];
+                        }
+                    },
+                    symbol: ['circle', 'circle'],
+                    symbolSize: [5, 5],
+                    lineStyle: {
+                        // color: '#EB635D',
+                        width: 2,
+                        type: 'solid',
+                        opacity: 1,
+                    },
+                    data: lineData
+                }
+            });
+            var myChart = echarts.init(document.getElementById('chartmain'));
+
+            var optionB = {
+                title: {
+                    text: "关键词网络图谱",
+                    textStyle: {
+                        color: '#fff',
+                        fontSize: 14
+                    },
+                    left: '5%',
+                    top: '3%'
+                },
+                tooltip: {
+                    trigger: "item",
+                    formatter: function (params) {
+                        // console.log(params);
+                        if (params.seriesType === 'pie') {
+                            return `
+                                    <div class="tip-box">
+                                        <span>
+                                            ${params.seriesName}
+                                        </span>
+                                        <ul>
+                                        <li><span>年度：</span>${params.name}</li>
+                                        <li><span>热度：</span>${params.value}</li>
+                                        </ul>
+                                    </div>
+                                    `
+                        } else {
+                            return `
+                                    <div class="tip-box">
+                                        <span>
+                                            ${params.data.targetData.data.source.name}<-->${params.data.targetData.data.target.name}
+                                        </span>
+                                        <ul>
+                                        <li><span>共现次数：</span>${params.data.targetData.data.value}</li>
+                                        </ul>
+                                    </div>
+                                    `
+                        }
+                    },
+                    transitionDuration: 0,
+                },
+                xAxis: {
+                    show: false,
+                },
+                yAxis: {
+                    show: false,
+                },//设置y轴
+                series: seriesArr
+            };
+            // 1、清除画布
+            myChart.clear();
+            ///2、在渲染点击事件之前先清除点击事件
+            myChart.off('click');
+            myChart.on('click', param => {
+                console.log(param);
+            });
+            myChart.setOption(optionB, true);
+            myChart.hideLoading();
+        }
+    </script>
+</body>
+
+</html>
+
